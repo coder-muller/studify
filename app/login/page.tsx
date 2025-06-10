@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/theme-toggle";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useLogin } from "@/hooks/useLogin";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Email inválido" }),
@@ -28,12 +29,18 @@ export default function LoginPage() {
     },
   })
 
+  const { login, loading } = useLogin()
   const router = useRouter()
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data)
-    toast.success("Login realizado com sucesso")
-    router.push("/profile")
+    login(data.email, data.password)
+      .then(() => {
+        toast.success("Login realizado com sucesso")
+        router.push("/profile")
+      })
+      .catch((error) => {
+        toast.error(error.message)
+      })
   }
 
   return (
@@ -66,7 +73,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="john.doe@example.com" type="email" {...field} />
+                      <Input placeholder="john.doe@example.com" type="email" {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -79,14 +86,14 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Senha</FormLabel>
                     <FormControl>
-                      <Input placeholder="••••••••" type="password" {...field} />
+                      <Input placeholder="••••••••" type="password" {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full mt-4">
-                Entrar
+              <Button type="submit" className="w-full mt-4" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Entrar"}
               </Button>
               <div className="flex flex-col items-center justify-center gap-2">
                 <p className="text-sm text-muted-foreground">

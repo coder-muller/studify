@@ -11,7 +11,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
 import { ModeToggle } from "@/components/theme-toggle"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
+import { useUser } from "@/hooks/useUser"
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Nome é obrigatório" }),
@@ -35,12 +36,18 @@ export default function SignupPage() {
     },
   })
 
+  const { createUser, loading } = useUser()
   const router = useRouter()
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data)
-    toast.success("Conta criada com sucesso")
-    router.push("/profile")
+    createUser(data.name, data.email, data.password)
+      .then(() => {
+        toast.success("Conta criada com sucesso")
+        router.push("/login")
+      })
+      .catch((error) => {
+        toast.error(error.message)
+      })
   }
 
   return (
@@ -73,7 +80,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Nome</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" type="name" {...field} />
+                      <Input placeholder="John Doe" type="name" {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -86,7 +93,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="john.doe@example.com" type="email" {...field} />
+                      <Input placeholder="john.doe@example.com" type="email" {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -100,7 +107,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input placeholder="••••••••" type="password" {...field} />
+                        <Input placeholder="••••••••" type="password" {...field} disabled={loading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -113,7 +120,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Confirmar Senha</FormLabel>
                       <FormControl>
-                        <Input placeholder="••••••••" type="password" {...field} />
+                        <Input placeholder="••••••••" type="password" {...field} disabled={loading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -121,8 +128,8 @@ export default function SignupPage() {
                 />
               </div>
               <div className="flex flex-col items-center justify-center gap-2">
-                <Button type="submit" className="w-full mt-4">
-                  Criar Conta
+                <Button type="submit" className="w-full mt-4" disabled={loading}>
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar Conta"}
                 </Button>
                 <p className="text-sm text-muted-foreground">
                   Já tem uma conta? <Link href="/login" className="text-primary hover:underline">Entrar</Link>

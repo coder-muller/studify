@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(uuid())
+  name       String
+  email      String      @unique
+  password   String
+  workSpaces WorkSpace[] @relation("OwnerWorkspaces")
+}
+
+model WorkSpace {
+  id        String   @id @default(uuid())
+  name      String
+  ownerId   String
+  owner     User     @relation("OwnerWorkspaces", fields: [ownerId], references: [id], onDelete: Cascade)
+  folders   Folder[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  files     File[]
+
+  @@index([ownerId])
+}
+
+model Folder {
+  id          String    @id @default(uuid())
+  name        String
+  workSpaceId String
+  workSpace   WorkSpace @relation(fields: [workSpaceId], references: [id], onDelete: Cascade)
+  files       File[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workSpaceId])
+}
+
+model File {
+  id      String @id @default(uuid())
+  title   String
+  content String
+
+  workSpaceId String
+  workSpace   WorkSpace @relation(fields: [workSpaceId], references: [id], onDelete: Cascade)
+
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workSpaceId])
+}
