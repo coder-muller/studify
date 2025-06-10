@@ -41,9 +41,9 @@ model Folder {
 }
 
 model File {
-  id      String @id @default(uuid())
+  id      String  @id @default(uuid())
   title   String
-  content String
+  content String?
 
   workSpaceId String
   workSpace   WorkSpace @relation(fields: [workSpaceId], references: [id], onDelete: Cascade)

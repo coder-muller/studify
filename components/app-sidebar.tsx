@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, Plus, Folder, FileText, MoreHorizontal, FolderOpen, Settings, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ChevronDown, Plus, Folder, FileText, MoreHorizontal, FolderOpen, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -9,7 +9,6 @@ import { z } from "zod"
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
     SidebarGroupAction,
     SidebarGroupContent,
@@ -23,7 +22,6 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
-    SidebarRail,
 } from "@/components/ui/sidebar"
 import {
     DropdownMenu,
@@ -73,45 +71,43 @@ const workspaceSchema = z.object({
 
 type WorkspaceFormData = z.infer<typeof workspaceSchema>
 
-const fileStructure = [
-    {
-        id: "1",
-        name: "Anotações Gerais",
-        type: "folder" as const,
-        children: [
-            { id: "1-1", name: "Resumo Capítulo 1.md", type: "file" as const },
-            { id: "1-2", name: "Exercícios Resolvidos.pdf", type: "file" as const },
-            { id: "1-3", name: "Dúvidas.txt", type: "file" as const },
-        ],
-    },
-    {
-        id: "2",
-        name: "Projetos",
-        type: "folder" as const,
-        children: [
-            {
-                id: "2-1",
-                name: "Projeto A",
-                type: "folder" as const,
-                children: [
-                    { id: "2-1-1", name: "README.md", type: "file" as const },
-                    { id: "2-1-2", name: "main.py", type: "file" as const },
-                ],
-            },
-            { id: "2-2", name: "Projeto B.zip", type: "file" as const },
-        ],
-    },
-    {
-        id: "3",
-        name: "Bibliografia.pdf",
-        type: "file" as const,
-    },
-    {
-        id: "4",
-        name: "Cronograma.xlsx",
-        type: "file" as const,
-    },
-]
+// Função para gerar a estrutura de arquivos baseada no workspace selecionado
+const generateFileStructure = (workspace: WorkSpace | null): FileItem[] => {
+    if (!workspace) return []
+
+    const structure: FileItem[] = []
+
+    // Adicionar pastas com seus arquivos
+    workspace.folders.forEach(folder => {
+        const folderFiles = workspace.files
+            .filter(file => file.folderId === folder.id)
+            .map(file => ({
+                id: file.id,
+                name: file.title,
+                type: "file" as const
+            }))
+
+        structure.push({
+            id: folder.id,
+            name: folder.name,
+            type: "folder" as const,
+            children: folderFiles
+        })
+    })
+
+    // Adicionar arquivos soltos (sem pasta)
+    const looseFiles = workspace.files
+        .filter(file => file.folderId === null)
+        .map(file => ({
+            id: file.id,
+            name: file.title,
+            type: "file" as const
+        }))
+
+    structure.push(...looseFiles)
+
+    return structure
+}
 
 interface FileItem {
     id: string
@@ -122,16 +118,15 @@ interface FileItem {
 
 interface FileTreeProps {
     items: FileItem[]
-    level?: number
 }
 
-function FileTree({ items, level = 0 }: FileTreeProps) {
+function FileTree({ items }: FileTreeProps) {
     return (
         <SidebarMenu>
             {items.map((item) => (
                 <SidebarMenuItem key={item.id}>
                     {item.type === "folder" ? (
-                        <Collapsible defaultOpen={level === 0}>
+                        <Collapsible defaultOpen={true}>
                             <CollapsibleTrigger asChild>
                                 <SidebarMenuButton className="w-full">
                                     <FolderOpen className="h-4 w-4" />
@@ -151,58 +146,47 @@ function FileTree({ items, level = 0 }: FileTreeProps) {
                                         Novo Arquivo
                                     </DropdownMenuItem>
                                     <DropdownMenuItem>
-                                        <Folder className="h-4 w-4 mr-2" />
-                                        Nova Pasta
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        Renomear
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive">Excluir Pasta</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Excluir
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            {item.children && (
-                                <CollapsibleContent>
-                                    <SidebarMenuSub>
-                                        {item.children.map((child) => (
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    {item.children && item.children.length > 0 ? (
+                                        item.children.map((child) => (
                                             <SidebarMenuSubItem key={child.id}>
-                                                {child.type === "folder" ? (
-                                                    <div className="w-full">
-                                                        <FileTree items={[child]} level={level + 1} />
-                                                    </div>
-                                                ) : (
-                                                    <SidebarMenuSubButton asChild>
-                                                        <a href="#" className="flex items-center gap-2">
-                                                            <FileText className="h-4 w-4" />
-                                                            <span>{child.name}</span>
-                                                        </a>
-                                                    </SidebarMenuSubButton>
-                                                )}
+                                                <SidebarMenuSubButton asChild>
+                                                    <a href={`/profile/${child.id}`} className="flex items-center gap-2">
+                                                        <FileText className="h-4 w-4" />
+                                                        <span>{child.name}</span>
+                                                    </a>
+                                                </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>
-                                        ))}
-                                    </SidebarMenuSub>
-                                </CollapsibleContent>
-                            )}
+                                        ))
+                                    ) : (
+                                        <SidebarMenuSubItem>
+                                            <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground italic">
+                                                <div className="w-4 h-4" /> {/* Espaço para alinhar com ícones */}
+                                                <span>Pasta vazia</span>
+                                            </div>
+                                        </SidebarMenuSubItem>
+                                    )}
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
                         </Collapsible>
                     ) : (
-                        <>
-                            <SidebarMenuButton asChild>
-                                <a href="#" className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    <span>{item.name}</span>
-                                </a>
-                            </SidebarMenuButton>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <SidebarMenuAction>
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </SidebarMenuAction>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="right" align="start">
-                                    <DropdownMenuItem>Abrir</DropdownMenuItem>
-                                    <DropdownMenuItem>Renomear</DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </>
+                        <SidebarMenuButton asChild>
+                            <a href={`/profile/${item.id}`} className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span>{item.name}</span>
+                            </a>
+                        </SidebarMenuButton>
                     )}
                 </SidebarMenuItem>
             ))}
@@ -485,7 +469,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     </div>
                                     <div className="flex flex-col gap-0.5 leading-none">
                                         <span className="font-semibold">Studify</span>
-                                        <span className="text-xs text-sidebar-foreground/70">{selectedWorkspace ? selectedWorkspace.name : <Loader2 className="h-4 w-4 animate-spin" />}</span>
+                                        <span className="text-xs text-sidebar-foreground/70 flex items-center gap-1">
+                                            {selectedWorkspace ? (
+                                                selectedWorkspace.name
+                                            ) : (
+                                                <>
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    Carregando...
+                                                </>
+                                            )}
+                                        </span>
                                     </div>
                                     <ChevronDown className="ml-auto h-4 w-4" />
                                 </SidebarMenuButton>
@@ -596,43 +589,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroup className="group-data-[collapsible=icon]:hidden">
                     <SidebarGroupLabel>Arquivos e Pastas</SidebarGroupLabel>
                     <SidebarGroupAction title="Adicionar Projeto">
-                        <Plus />
-                        <span className="sr-only">Adicionar Projeto</span>
                     </SidebarGroupAction>
                     <SidebarGroupContent>
-                        <FileTree items={fileStructure} />
+                        <FileTree items={generateFileStructure(selectedWorkspace)} />
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-
-            <SidebarFooter>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <SidebarMenuButton>
-                                    <Settings className="h-4 w-4" />
-                                    <span>Configurações</span>
-                                    <ChevronDown className="ml-auto h-4 w-4" />
-                                </SidebarMenuButton>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
-                                <DropdownMenuItem>
-                                    <span>Preferências</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <span>Sobre o Studify</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                    <span>Sair</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarFooter>
-            <SidebarRail />
         </Sidebar>
     )
 }

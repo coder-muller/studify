@@ -9,13 +9,20 @@ import { useTheme } from "next-themes"
 import { useGetMe } from "@/hooks/useGetMe"
 import { useEffect } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useGetFile } from "@/hooks/useGetFile"
 
 export default function Header() {
     const { theme, setTheme } = useTheme()
     const { user, error, loading, getMe } = useGetMe()
+    const { fileId } = useParams()
+    const { file, error: fileError, loading: fileLoading, getFile } = useGetFile()
 
     useEffect(() => {
         getMe()
+        if (fileId) {
+            getFile(fileId as string)
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -25,15 +32,31 @@ export default function Header() {
                 <SidebarTrigger />
                 <Breadcrumb>
                     <BreadcrumbList>
-                        <BreadcrumbItem className="hidden md:block">
+                        {fileId ? (
+                            <>
+                                <Link href="/profile">
+                                    <BreadcrumbItem>
+                                        <BreadcrumbPage>{file?.workSpace.name}</BreadcrumbPage>
+                                    </BreadcrumbItem>
+                                </Link>
+                                <BreadcrumbSeparator className="hidden md:block" />
+                                {file?.folder && (
+                                    <>
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>{file.folder.name}</BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                        <BreadcrumbSeparator className="hidden md:block" />
+                                    </>
+                                )}
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage>{file?.title}</BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </>
+                        ) : (
                             <Link href="/profile">
-                                <BreadcrumbLink>Perfil</BreadcrumbLink>
+                                <BreadcrumbLink>Selecione um arquivo</BreadcrumbLink>
                             </Link>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator className="hidden md:block" />
-                        <BreadcrumbItem>
-                            <BreadcrumbPage>Anotações Gerais</BreadcrumbPage>
-                        </BreadcrumbItem>
+                        )}
                     </BreadcrumbList>
                 </Breadcrumb>
             </div>
@@ -70,7 +93,7 @@ export default function Header() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-        </div>
+        </div >
     )
 
 }
