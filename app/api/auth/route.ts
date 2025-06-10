@@ -39,5 +39,13 @@ export async function POST(req: NextRequest) {
         path: "/"
     })
 
+    cookieStore.set("userId", user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 3600,
+        sameSite: "strict",
+        path: "/"
+    })
+
     return NextResponse.json({ message: "Login realizado com sucesso" }, { status: 200 })
 }
