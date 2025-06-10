@@ -25,6 +25,10 @@ export async function GET() {
         where: {
             ownerId: userId
         },
+        include: {
+            files: true,
+            folders: true
+        }
     })
 
     return NextResponse.json(workSpaces, { status: 200 })

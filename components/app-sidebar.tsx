@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, Plus, Folder, FileText, MoreHorizontal, FolderOpen, Settings, Search, Sprout, Loader2 } from "lucide-react"
+import { ChevronDown, Plus, Folder, FileText, MoreHorizontal, FolderOpen, Settings, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 import {
     Sidebar,
@@ -29,48 +32,84 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { useWorkSpace } from "@/hooks/useWorkSpace"
 import { WorkSpace } from "@/lib/types"
 
+// Schema para validação do formulário de workspace
+const workspaceSchema = z.object({
+    name: z.string().min(1, "Nome é obrigatório").min(3, "Nome deve ter pelo menos 3 caracteres").max(50, "Nome deve ter no máximo 50 caracteres"),
+})
+
+type WorkspaceFormData = z.infer<typeof workspaceSchema>
+
 const fileStructure = [
     {
         id: "1",
         name: "Anotações Gerais",
-        type: "folder",
+        type: "folder" as const,
         children: [
-            { id: "1-1", name: "Resumo Capítulo 1.md", type: "file" },
-            { id: "1-2", name: "Exercícios Resolvidos.pdf", type: "file" },
-            { id: "1-3", name: "Dúvidas.txt", type: "file" },
+            { id: "1-1", name: "Resumo Capítulo 1.md", type: "file" as const },
+            { id: "1-2", name: "Exercícios Resolvidos.pdf", type: "file" as const },
+            { id: "1-3", name: "Dúvidas.txt", type: "file" as const },
         ],
     },
     {
         id: "2",
         name: "Projetos",
-        type: "folder",
+        type: "folder" as const,
         children: [
             {
                 id: "2-1",
                 name: "Projeto A",
-                type: "folder",
+                type: "folder" as const,
                 children: [
-                    { id: "2-1-1", name: "README.md", type: "file" },
-                    { id: "2-1-2", name: "main.py", type: "file" },
+                    { id: "2-1-1", name: "README.md", type: "file" as const },
+                    { id: "2-1-2", name: "main.py", type: "file" as const },
                 ],
             },
-            { id: "2-2", name: "Projeto B.zip", type: "file" },
+            { id: "2-2", name: "Projeto B.zip", type: "file" as const },
         ],
     },
     {
         id: "3",
         name: "Bibliografia.pdf",
-        type: "file",
+        type: "file" as const,
     },
     {
         id: "4",
         name: "Cronograma.xlsx",
-        type: "file",
+        type: "file" as const,
     },
 ]
 
@@ -171,18 +210,264 @@ function FileTree({ items, level = 0 }: FileTreeProps) {
     )
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const { workSpaces, loading, error, getWorkSpaces, createWorkSpace, updateWorkSpace, deleteWorkSpace } = useWorkSpace()
+// Componente para formulário de criação de workspace
+function CreateWorkspaceDialog({ onWorkspaceCreated }: { onWorkspaceCreated: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { createWorkSpace, loading } = useWorkSpace()
 
-    const [selectedWorkspace, setSelectedWorkspace] = useState<WorkSpace>(workSpaces[0])
+    const form = useForm<WorkspaceFormData>({
+        resolver: zodResolver(workspaceSchema),
+        defaultValues: {
+            name: "",
+        },
+    })
+
+    const onSubmit = async (data: WorkspaceFormData) => {
+        await createWorkSpace(data.name)
+        setOpen(false)
+        form.reset()
+        onWorkspaceCreated()
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <DropdownMenuItem
+                    className="gap-2 p-2"
+                    onSelect={(e) => {
+                        e.preventDefault()
+                        setOpen(true)
+                    }}
+                >
+                    <div className="flex size-6 items-center justify-center rounded-sm border">
+                        <Plus className="size-4" />
+                    </div>
+                    <div className="font-medium text-muted-foreground">Novo Workspace</div>
+                </DropdownMenuItem>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Criar Novo Workspace</DialogTitle>
+                    <DialogDescription>
+                        Digite o nome do seu novo workspace.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nome do Workspace</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Digite o nome..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="submit" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Criando...
+                                    </>
+                                ) : (
+                                    "Criar Workspace"
+                                )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setOpen(false)
+                                    form.reset()
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// Componente para formulário de edição de workspace
+function EditWorkspaceDialog({ workspace, onWorkspaceUpdated }: { workspace: WorkSpace; onWorkspaceUpdated: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { updateWorkSpace, loading } = useWorkSpace()
+
+    const form = useForm<WorkspaceFormData>({
+        resolver: zodResolver(workspaceSchema),
+        defaultValues: {
+            name: workspace.name,
+        },
+    })
+
+    const onSubmit = async (data: WorkspaceFormData) => {
+        await updateWorkSpace(workspace.id, data.name)
+        setOpen(false)
+        form.reset({ name: data.name })
+        onWorkspaceUpdated()
+    }
+
+    return (
+        <>
+            <DropdownMenuItem
+                onSelect={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    form.reset({ name: workspace.name })
+                    setOpen(true)
+                }}
+            >
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar
+            </DropdownMenuItem>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Workspace</DialogTitle>
+                        <DialogDescription>
+                            Altere o nome do workspace.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nome do Workspace</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Digite o nome..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <DialogFooter>
+                                <Button type="submit" disabled={loading}>
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Salvando...
+                                        </>
+                                    ) : (
+                                        "Salvar Alterações"
+                                    )}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setOpen(false)
+                                        form.reset({ name: workspace.name })
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+        </>
+    )
+}
+
+// Componente para confirmação de exclusão de workspace
+function DeleteWorkspaceAlert({ workspace, onWorkspaceDeleted, canDelete }: { workspace: WorkSpace; onWorkspaceDeleted: () => void; canDelete: boolean }) {
+    const [open, setOpen] = useState(false)
+    const { deleteWorkSpace, loading } = useWorkSpace()
+
+    const handleDelete = async () => {
+        if (!canDelete) return
+
+        await deleteWorkSpace(workspace.id)
+        setOpen(false)
+        onWorkspaceDeleted()
+    }
+
+    if (!canDelete) {
+        return null
+    }
+
+    return (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger asChild>
+                <DropdownMenuItem
+                    className="text-destructive"
+                    onSelect={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setOpen(true)
+                    }}
+                >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                </DropdownMenuItem>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir Workspace</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tem certeza que deseja excluir o workspace &quot;{workspace.name}&quot;?
+                        <br />
+                        <br />
+                        <strong>⚠️ Esta ação é irreversível!</strong>
+                        <br />
+                        Todos os arquivos, pastas e conteúdos associados a este workspace serão permanentemente removidos.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={loading}
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excluindo...
+                            </>
+                        ) : (
+                            "Excluir Workspace"
+                        )}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )
+}
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const { workSpaces, loading, error, getWorkSpaces } = useWorkSpace()
+    const [selectedWorkspace, setSelectedWorkspace] = useState<WorkSpace | null>(null)
+
+    // Função para atualizar a lista de workspaces e garantir que sempre tenha um selecionado
+    const handleWorkspacesUpdate = async () => {
+        await getWorkSpaces()
+    }
 
     useEffect(() => {
         getWorkSpaces()
-        if (workSpaces.length > 0) {
-            setSelectedWorkspace(workSpaces[0])
-        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    // Sempre selecionar o primeiro workspace quando a lista mudar
+    useEffect(() => {
+        if (workSpaces.length > 0 && (!selectedWorkspace || !workSpaces.find(ws => ws.id === selectedWorkspace.id))) {
+            setSelectedWorkspace(workSpaces[0])
+        }
+    }, [workSpaces, selectedWorkspace])
 
     return (
         <Sidebar {...props}>
@@ -200,35 +485,67 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     </div>
                                     <div className="flex flex-col gap-0.5 leading-none">
                                         <span className="font-semibold">Studify</span>
-                                        <span className="text-xs text-sidebar-foreground/70">{selectedWorkspace?.name || "Selecione um workspace"}</span>
+                                        <span className="text-xs text-sidebar-foreground/70">{selectedWorkspace ? selectedWorkspace.name : <Loader2 className="h-4 w-4 animate-spin" />}</span>
                                     </div>
                                     <ChevronDown className="ml-auto h-4 w-4" />
                                 </SidebarMenuButton>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
-                                <DropdownMenuItem className="gap-2 p-2">
-                                    <div className="flex size-6 items-center justify-center rounded-sm border">
-                                        <Plus className="size-4" />
-                                    </div>
-                                    <div className="font-medium text-muted-foreground">Novo Workspace</div>
-                                </DropdownMenuItem>
+                                <CreateWorkspaceDialog onWorkspaceCreated={handleWorkspacesUpdate} />
                                 <DropdownMenuSeparator />
                                 {loading ? (
                                     <DropdownMenuItem>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        Carregando...
                                     </DropdownMenuItem>
-                                ) : workSpaces.length > 0 || error ? (
+                                ) : error ? (
+                                    <DropdownMenuItem>
+                                        <span className="text-destructive">Erro ao carregar workspaces</span>
+                                    </DropdownMenuItem>
+                                ) : workSpaces.length > 0 ? (
                                     workSpaces.map((workspace) => (
-                                        <DropdownMenuItem
-                                            key={workspace.id}
-                                            onClick={() => setSelectedWorkspace(workspace)}
-                                            className="gap-2 p-2"
-                                        >
-                                            <div className="flex size-6 items-center justify-center rounded-sm border">
-                                                <Sprout className="size-4" />
-                                            </div>
-                                            <div className="font-medium">{workspace.name}</div>
-                                        </DropdownMenuItem>
+                                        <div key={workspace.id} className="flex items-center w-full">
+                                            <DropdownMenuItem
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSelectedWorkspace(workspace)
+                                                }}
+                                                className="gap-2 p-2 flex-1 flex items-center"
+                                            >
+                                                <div className="font-medium">{workspace.name}</div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 mr-1"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            e.preventDefault()
+                                                        }}
+                                                    >
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent side="right" align="start">
+                                                    <EditWorkspaceDialog
+                                                        workspace={workspace}
+                                                        onWorkspaceUpdated={handleWorkspacesUpdate}
+                                                    />
+                                                    {workSpaces.length > 1 && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DeleteWorkspaceAlert
+                                                                workspace={workspace}
+                                                                onWorkspaceDeleted={handleWorkspacesUpdate}
+                                                                canDelete={workSpaces.length > 1}
+                                                            />
+                                                        </>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     ))
                                 ) : (
                                     <DropdownMenuItem>
@@ -283,7 +600,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <span className="sr-only">Adicionar Projeto</span>
                     </SidebarGroupAction>
                     <SidebarGroupContent>
-                        <FileTree items={fileStructure as FileItem[]} />
+                        <FileTree items={fileStructure} />
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
