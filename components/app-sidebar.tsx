@@ -865,7 +865,7 @@ function DeleteWorkspaceAlert({ workspace, onWorkspaceDeleted, canDelete }: { wo
     )
 }
 
-export function AppSidebar({ onFileSelect, selectedFile, ...props }: React.ComponentProps<typeof Sidebar> & { onFileSelect?: (file: File | null) => void, selectedFile: File | null }) {
+export function AppSidebar({ onFileSelect, selectedFile, onDataUpdate, onRegisterUpdate, ...props }: React.ComponentProps<typeof Sidebar> & { onFileSelect?: (file: File | null) => void, selectedFile: File | null, onDataUpdate?: () => void, onRegisterUpdate?: (updateFn: () => void) => void }) {
     const { workSpaces, loading, error, getWorkSpaces } = useWorkSpace()
     const [selectedWorkspace, setSelectedWorkspace] = useState<WorkSpace | null>(null)
 
@@ -884,6 +884,8 @@ export function AppSidebar({ onFileSelect, selectedFile, ...props }: React.Compo
                 setSelectedWorkspace(updatedWorkspace)
             }
         }
+        // Notificar componente pai se callback foi fornecido
+        onDataUpdate?.()
     }
 
     // Função para lidar com seleção de arquivo
@@ -897,6 +899,8 @@ export function AppSidebar({ onFileSelect, selectedFile, ...props }: React.Compo
 
     useEffect(() => {
         getWorkSpaces()
+        // Registrar função de update com o componente pai
+        onRegisterUpdate?.(handleDataUpdate)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
