@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, Plus, Folder, FileText, MoreHorizontal, FolderOpen, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ChevronDown, Plus, Folder as FolderIcon, FileText, MoreHorizontal, FolderOpen, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -62,14 +62,26 @@ import { Input } from "@/components/ui/input"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { useWorkSpace } from "@/hooks/useWorkSpace"
-import { File, WorkSpace } from "@/lib/types"
+import { useFolder } from "@/hooks/useFolder"
+import { useFiles } from "@/hooks/useFiles"
+import { File, WorkSpace, Folder } from "@/lib/types"
 
-// Schema para validação do formulário de workspace
+// Schemas para validação dos formulários
 const workspaceSchema = z.object({
     name: z.string().min(1, "Nome é obrigatório").min(3, "Nome deve ter pelo menos 3 caracteres").max(50, "Nome deve ter no máximo 50 caracteres"),
 })
 
+const folderSchema = z.object({
+    name: z.string().min(1, "Nome é obrigatório").min(2, "Nome deve ter pelo menos 2 caracteres").max(50, "Nome deve ter no máximo 50 caracteres"),
+})
+
+const fileSchema = z.object({
+    title: z.string().min(1, "Título é obrigatório").min(2, "Título deve ter pelo menos 2 caracteres").max(100, "Título deve ter no máximo 100 caracteres"),
+})
+
 type WorkspaceFormData = z.infer<typeof workspaceSchema>
+type FolderFormData = z.infer<typeof folderSchema>
+type FileFormData = z.infer<typeof fileSchema>
 
 // Função para gerar a estrutura de arquivos baseada no workspace selecionado
 const generateFileStructure = (workspace: WorkSpace | null): { items: FileItem[], filesMap: Map<string, File> } => {
@@ -140,9 +152,13 @@ interface FileTreeProps {
     filesMap: Map<string, File>
     selectedFile: File | null
     setSelectedFile: (file: File | null) => void
+    selectedWorkspace: WorkSpace | null
+    onDataUpdate: () => void
 }
 
-function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreeProps) {
+function FileTree({ items, filesMap, selectedFile, setSelectedFile, selectedWorkspace, onDataUpdate }: FileTreeProps) {
+    const { moveFile } = useFiles()
+    
     const handleFileClick = (item: FileItem) => {
         if (item.type === "file") {
             const file = filesMap.get(item.id)
@@ -152,14 +168,57 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreePr
         }
     }
 
+    // Drag and Drop handlers
+    const handleDragStart = (e: React.DragEvent, fileId: string) => {
+        e.dataTransfer.setData('text/plain', fileId)
+    }
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+    }
+
+    const handleDrop = async (e: React.DragEvent, targetFolderId: string | null) => {
+        e.preventDefault()
+        const fileId = e.dataTransfer.getData('text/plain')
+        
+        // Verificar se o arquivo realmente existe
+        const file = filesMap.get(fileId)
+        if (!file) return
+
+        // Verificar se não está sendo movido para a mesma pasta
+        if (file.folderId === targetFolderId) return
+
+        try {
+            await moveFile(fileId, targetFolderId)
+            onDataUpdate()
+        } catch (error) {
+            console.error('Erro ao mover arquivo:', error)
+        }
+    }
+
+    // Função para encontrar dados da pasta pelos items
+    const getFolderFromItems = (folderId: string): Folder | null => {
+        if (!selectedWorkspace) return null
+        return selectedWorkspace.folders.find(f => f.id === folderId) || null
+    }
+
     return (
-        <SidebarMenu>
-            {items.map((item) => (
+        <div 
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, null)}
+            className="min-h-[200px]"
+        >
+            <SidebarMenu>
+                {items.map((item) => (
                 <SidebarMenuItem key={item.id}>
                     {item.type === "folder" ? (
-                        <Collapsible defaultOpen={true}>
+                        <Collapsible defaultOpen={false}>
                             <CollapsibleTrigger asChild>
-                                <SidebarMenuButton className="w-full">
+                                <SidebarMenuButton 
+                                    className="w-full"
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, item.id)}
+                                >
                                     <FolderOpen className="h-4 w-4" />
                                     <span>{item.name}</span>
                                     <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
@@ -171,21 +230,34 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreePr
                                         <MoreHorizontal className="h-4 w-4" />
                                     </SidebarMenuAction>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent side="right" align="start">
-                                    <DropdownMenuItem>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Novo Arquivo
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Pencil className="h-4 w-4 mr-2" />
-                                        Renomear
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Excluir
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
+                                                            <DropdownMenuContent side="right" align="start">
+                                {selectedWorkspace && (
+                                    <>
+                                        <CreateFileDialog
+                                            workSpaceId={selectedWorkspace.id}
+                                            folderId={item.id}
+                                            onFileCreated={onDataUpdate}
+                                        />
+                                        <DropdownMenuSeparator />
+                                        {(() => {
+                                            const folder = getFolderFromItems(item.id)
+                                            return folder ? (
+                                                <>
+                                                    <EditFolderDialog
+                                                        folder={folder}
+                                                        onFolderUpdated={onDataUpdate}
+                                                    />
+                                                    <DropdownMenuSeparator />
+                                                    <DeleteFolderAlert
+                                                        folder={folder}
+                                                        onFolderDeleted={onDataUpdate}
+                                                    />
+                                                </>
+                                            ) : null
+                                        })()}
+                                    </>
+                                )}
+                            </DropdownMenuContent>
                             </DropdownMenu>
                             <CollapsibleContent>
                                 <SidebarMenuSub>
@@ -193,9 +265,11 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreePr
                                         item.children.map((child) => (
                                             <SidebarMenuSubItem key={child.id}>
                                                 <SidebarMenuSubButton asChild>
-                                                    <p
-                                                        className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === child.id ? 'bg-accent text-accent-foreground' : ''}`}
+                                                                                                        <p 
+                                                        className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === child.id ? 'bg-accent text-accent-foreground' : ''}`} 
                                                         onClick={() => handleFileClick(child)}
+                                                        draggable={true}
+                                                        onDragStart={(e) => handleDragStart(e, child.id)}
                                                     >
                                                         <FileText className="h-4 w-4" />
                                                         <span>{child.name}</span>
@@ -215,10 +289,12 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreePr
                             </CollapsibleContent>
                         </Collapsible>
                     ) : (
-                        <SidebarMenuButton asChild>
-                            <p
-                                className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === item.id ? 'bg-accent text-accent-foreground' : ''}`}
+                                                <SidebarMenuButton asChild>
+                            <p 
+                                className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === item.id ? 'bg-accent text-accent-foreground' : ''}`} 
                                 onClick={() => handleFileClick(item)}
+                                draggable={true}
+                                onDragStart={(e) => handleDragStart(e, item.id)}
                             >
                                 <FileText className="h-4 w-4" />
                                 <span>{item.name}</span>
@@ -227,7 +303,327 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreePr
                     )}
                 </SidebarMenuItem>
             ))}
-        </SidebarMenu>
+            </SidebarMenu>
+        </div>
+    )
+}
+
+// Componente para formulário de criação de pasta
+function CreateFolderDialog({ workSpaceId, onFolderCreated }: { workSpaceId: string; onFolderCreated: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { createFolder, loading } = useFolder()
+
+    const form = useForm<FolderFormData>({
+        resolver: zodResolver(folderSchema),
+        defaultValues: {
+            name: "",
+        },
+    })
+
+    const onSubmit = async (data: FolderFormData) => {
+        try {
+            await createFolder(data.name, workSpaceId)
+            setOpen(false)
+            form.reset()
+            onFolderCreated()
+        } catch {
+            // Erro já tratado no hook
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start gap-2">
+                    <FolderIcon className="h-4 w-4" />
+                    <span>Nova Pasta</span>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Criar Nova Pasta</DialogTitle>
+                    <DialogDescription>
+                        Digite o nome da sua nova pasta.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nome da Pasta</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Digite o nome..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="submit" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Criando...
+                                    </>
+                                ) : (
+                                    "Criar Pasta"
+                                )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setOpen(false)
+                                    form.reset()
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// Componente para formulário de criação de arquivo
+function CreateFileDialog({ workSpaceId, folderId = null, onFileCreated }: { workSpaceId: string; folderId?: string | null; onFileCreated: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { createFile, loading } = useFiles()
+
+    const form = useForm<FileFormData>({
+        resolver: zodResolver(fileSchema),
+        defaultValues: {
+            title: "",
+        },
+    })
+
+    const onSubmit = async (data: FileFormData) => {
+        try {
+            await createFile(data.title, workSpaceId, folderId)
+            setOpen(false)
+            form.reset()
+            onFileCreated()
+        } catch {
+            // Erro já tratado no hook
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start gap-2">
+                    <Plus className="h-4 w-4" />
+                    <span>Novo Arquivo</span>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Criar Novo Arquivo</DialogTitle>
+                    <DialogDescription>
+                        Digite o título do seu novo arquivo.
+                        {folderId ? " O arquivo será criado na pasta selecionada." : " O arquivo será criado na raiz do workspace."}
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="title"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Título do Arquivo</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Digite o título..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="submit" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Criando...
+                                    </>
+                                ) : (
+                                    "Criar Arquivo"
+                                )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setOpen(false)
+                                    form.reset()
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// Componente para formulário de edição de pasta
+function EditFolderDialog({ folder, onFolderUpdated }: { folder: Folder; onFolderUpdated: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { updateFolder, loading } = useFolder()
+
+    const form = useForm<FolderFormData>({
+        resolver: zodResolver(folderSchema),
+        defaultValues: {
+            name: folder.name,
+        },
+    })
+
+    const onSubmit = async (data: FolderFormData) => {
+        try {
+            await updateFolder(folder.id, data.name)
+            setOpen(false)
+            form.reset({ name: data.name })
+            onFolderUpdated()
+        } catch {
+            // Erro já tratado no hook
+        }
+    }
+
+    return (
+        <>
+            <DropdownMenuItem
+                onSelect={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    form.reset({ name: folder.name })
+                    setOpen(true)
+                }}
+            >
+                <Pencil className="h-4 w-4 mr-2" />
+                Renomear
+            </DropdownMenuItem>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Pasta</DialogTitle>
+                        <DialogDescription>
+                            Altere o nome da pasta.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nome da Pasta</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Digite o nome..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <DialogFooter>
+                                <Button type="submit" disabled={loading}>
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Salvando...
+                                        </>
+                                    ) : (
+                                        "Salvar Alterações"
+                                    )}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setOpen(false)
+                                        form.reset({ name: folder.name })
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+        </>
+    )
+}
+
+// Componente para confirmação de exclusão de pasta
+function DeleteFolderAlert({ folder, onFolderDeleted }: { folder: Folder; onFolderDeleted: () => void }) {
+    const [open, setOpen] = useState(false)
+    const { deleteFolder, loading } = useFolder()
+
+    const handleDelete = async () => {
+        try {
+            await deleteFolder(folder.id)
+            setOpen(false)
+            onFolderDeleted()
+        } catch {
+            // Erro já tratado no hook
+        }
+    }
+
+    return (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger asChild>
+                <DropdownMenuItem
+                    className="text-destructive"
+                    onSelect={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setOpen(true)
+                    }}
+                >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                </DropdownMenuItem>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir Pasta</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tem certeza que deseja excluir a pasta &quot;{folder.name}&quot;?
+                        <br />
+                        <br />
+                        <strong>⚠️ Esta ação só funcionará se a pasta estiver vazia!</strong>
+                        <br />
+                        Mova ou exclua os arquivos da pasta antes de excluí-la.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={loading}
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excluindo...
+                            </>
+                        ) : (
+                            "Excluir Pasta"
+                        )}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     )
 }
 
@@ -469,23 +865,35 @@ function DeleteWorkspaceAlert({ workspace, onWorkspaceDeleted, canDelete }: { wo
     )
 }
 
-export function AppSidebar({ onFileSelect, ...props }: React.ComponentProps<typeof Sidebar> & { onFileSelect?: (file: File | null) => void, selectedFile: File | null }) {
+export function AppSidebar({ onFileSelect, selectedFile, ...props }: React.ComponentProps<typeof Sidebar> & { onFileSelect?: (file: File | null) => void, selectedFile: File | null }) {
     const { workSpaces, loading, error, getWorkSpaces } = useWorkSpace()
     const [selectedWorkspace, setSelectedWorkspace] = useState<WorkSpace | null>(null)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
     // Função para atualizar a lista de workspaces e garantir que sempre tenha um selecionado
     const handleWorkspacesUpdate = async () => {
         await getWorkSpaces()
     }
 
+    // Função para atualizar dados após mudanças em pastas/arquivos
+    const handleDataUpdate = async () => {
+        await getWorkSpaces() // Isso recarrega tudo incluindo pastas e arquivos
+        // Forçar re-render do componente
+        if (selectedWorkspace) {
+            const updatedWorkspace = workSpaces.find(ws => ws.id === selectedWorkspace.id)
+            if (updatedWorkspace) {
+                setSelectedWorkspace(updatedWorkspace)
+            }
+        }
+    }
+
     // Função para lidar com seleção de arquivo
     const handleFileSelect = (file: File | null) => {
-        setSelectedFile(file)
         if (onFileSelect) {
             onFileSelect(file)
         }
     }
+
+    // TODO: Implementar drag and drop
 
     useEffect(() => {
         getWorkSpaces()
@@ -499,7 +907,9 @@ export function AppSidebar({ onFileSelect, ...props }: React.ComponentProps<type
         }
     }, [workSpaces, selectedWorkspace])
 
-    const { items: fileStructure, filesMap } = generateFileStructure(selectedWorkspace)
+    // Sempre usar a versão mais atual do workspace dos workSpaces
+    const currentWorkspace = selectedWorkspace ? workSpaces.find(ws => ws.id === selectedWorkspace.id) || null : null
+    const { items: fileStructure, filesMap } = generateFileStructure(currentWorkspace)
 
     return (
         <Sidebar {...props}>
@@ -614,22 +1024,26 @@ export function AppSidebar({ onFileSelect, ...props }: React.ComponentProps<type
                     <SidebarGroupLabel>Ações Rápidas</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Button variant="ghost" className="w-full justify-start gap-2">
-                                        <Plus className="h-4 w-4" />
-                                        <span>Novo Arquivo</span>
-                                    </Button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Button variant="ghost" className="w-full justify-start gap-2">
-                                        <Folder className="h-4 w-4" />
-                                        <span>Nova Pasta</span>
-                                    </Button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {currentWorkspace && (
+                                <>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <CreateFileDialog 
+                                                workSpaceId={currentWorkspace.id} 
+                                                onFileCreated={handleDataUpdate}
+                                            />
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <CreateFolderDialog 
+                                                workSpaceId={currentWorkspace.id} 
+                                                onFolderCreated={handleDataUpdate}
+                                            />
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </>
+                            )}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
@@ -644,6 +1058,8 @@ export function AppSidebar({ onFileSelect, ...props }: React.ComponentProps<type
                             filesMap={filesMap}
                             selectedFile={selectedFile}
                             setSelectedFile={handleFileSelect}
+                            selectedWorkspace={currentWorkspace}
+                            onDataUpdate={handleDataUpdate}
                         />
                     </SidebarGroupContent>
                 </SidebarGroup>
