@@ -5,7 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Header from "@/components/header";
 import { Label } from "@/components/ui/label";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { FileEditor } from "@/components/FileEditor";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { File } from "@/lib/types";
 import { Sprout } from "lucide-react";
 
@@ -56,10 +56,10 @@ export default function NotesPage() {
                         saveStatus={saveStatus}
                         hasChanges={hasChanges}
                     />
-                    <div className="flex-1 overflow-hidden w-3/4 mx-auto">
+                    <div className="flex-1 w-4/5 mx-auto overflow-y-auto p-6">
                         {selectedFile ? (
-                            <FileEditor
-                                file={selectedFile}
+                            <MarkdownEditor 
+                                file={selectedFile} 
                                 onSaveSuccess={handleSaveSuccess}
                                 onStatusChange={handleStatusChange}
                             />

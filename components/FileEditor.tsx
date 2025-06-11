@@ -74,7 +74,7 @@ export function FileEditor({ file, onSaveSuccess, onStatusChange }: FileEditorPr
     return (
         <div className="w-full h-full flex flex-col">
             {/* Área de edição */}
-            <div className="flex-1 p-6 mx-auto w-full overflow-y-auto">
+            <div className="flex-1 mx-auto w-full overflow-y-auto">
                 {/* Título editável */}
                 <h1
                     ref={titleRef}
@@ -82,7 +82,7 @@ export function FileEditor({ file, onSaveSuccess, onStatusChange }: FileEditorPr
                     suppressContentEditableWarning
                     onInput={handleTitleChange}
                     onKeyDown={handleTitleKeyDown}
-                    className="text-5xl font-bold mb-8 outline-none border-none focus:ring-0 text-foreground transition-colors hover:bg-muted/20 rounded-md p-2 -m-2 empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60"
+                    className="text-5xl font-bold mb-8 outline-none border-none focus:ring-0 text-foreground transition-colors rounded-md p-2 -m-2 empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60"
                     data-placeholder="Título do arquivo"
                     style={{ 
                         caretColor: 'hsl(var(--foreground))',
