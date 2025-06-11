@@ -56,7 +56,7 @@ export default function NotesPage() {
                         saveStatus={saveStatus}
                         hasChanges={hasChanges}
                     />
-                    <div className="flex-1 w-4/5 mx-auto overflow-y-auto p-6">
+                    <div className="flex-1 w-full md:w-4/5 mx-auto overflow-y-auto p-6">
                         {selectedFile ? (
                             <MarkdownEditor 
                                 file={selectedFile} 
