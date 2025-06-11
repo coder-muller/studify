@@ -62,7 +62,7 @@ import { Input } from "@/components/ui/input"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { useWorkSpace } from "@/hooks/useWorkSpace"
-import { WorkSpace } from "@/lib/types"
+import { File, WorkSpace } from "@/lib/types"
 
 // Schema para validação do formulário de workspace
 const workspaceSchema = z.object({
@@ -72,20 +72,30 @@ const workspaceSchema = z.object({
 type WorkspaceFormData = z.infer<typeof workspaceSchema>
 
 // Função para gerar a estrutura de arquivos baseada no workspace selecionado
-const generateFileStructure = (workspace: WorkSpace | null): FileItem[] => {
-    if (!workspace) return []
+const generateFileStructure = (workspace: WorkSpace | null): { items: FileItem[], filesMap: Map<string, File> } => {
+    if (!workspace) return { items: [], filesMap: new Map() }
 
     const structure: FileItem[] = []
+    const filesMap = new Map<string, File>()
 
     // Adicionar pastas com seus arquivos
     workspace.folders.forEach(folder => {
         const folderFiles = workspace.files
             .filter(file => file.folderId === folder.id)
-            .map(file => ({
-                id: file.id,
-                name: file.title,
-                type: "file" as const
-            }))
+            .map(file => {
+                // Garantir que o arquivo tenha as relações populadas
+                const enrichedFile: File = {
+                    ...file,
+                    workSpace: workspace,
+                    folder: folder
+                }
+                filesMap.set(file.id, enrichedFile)
+                return {
+                    id: file.id,
+                    name: file.title,
+                    type: "file" as const
+                }
+            })
 
         structure.push({
             id: folder.id,
@@ -98,15 +108,24 @@ const generateFileStructure = (workspace: WorkSpace | null): FileItem[] => {
     // Adicionar arquivos soltos (sem pasta)
     const looseFiles = workspace.files
         .filter(file => file.folderId === null)
-        .map(file => ({
-            id: file.id,
-            name: file.title,
-            type: "file" as const
-        }))
+        .map(file => {
+            // Garantir que o arquivo tenha as relações populadas
+            const enrichedFile: File = {
+                ...file,
+                workSpace: workspace,
+                folder: null
+            }
+            filesMap.set(file.id, enrichedFile)
+            return {
+                id: file.id,
+                name: file.title,
+                type: "file" as const
+            }
+        })
 
     structure.push(...looseFiles)
 
-    return structure
+    return { items: structure, filesMap }
 }
 
 interface FileItem {
@@ -118,9 +137,21 @@ interface FileItem {
 
 interface FileTreeProps {
     items: FileItem[]
+    filesMap: Map<string, File>
+    selectedFile: File | null
+    setSelectedFile: (file: File | null) => void
 }
 
-function FileTree({ items }: FileTreeProps) {
+function FileTree({ items, filesMap, selectedFile, setSelectedFile }: FileTreeProps) {
+    const handleFileClick = (item: FileItem) => {
+        if (item.type === "file") {
+            const file = filesMap.get(item.id)
+            if (file) {
+                setSelectedFile(file)
+            }
+        }
+    }
+
     return (
         <SidebarMenu>
             {items.map((item) => (
@@ -162,10 +193,13 @@ function FileTree({ items }: FileTreeProps) {
                                         item.children.map((child) => (
                                             <SidebarMenuSubItem key={child.id}>
                                                 <SidebarMenuSubButton asChild>
-                                                    <a href={`/profile/${child.id}`} className="flex items-center gap-2">
+                                                    <p
+                                                        className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === child.id ? 'bg-accent text-accent-foreground' : ''}`}
+                                                        onClick={() => handleFileClick(child)}
+                                                    >
                                                         <FileText className="h-4 w-4" />
                                                         <span>{child.name}</span>
-                                                    </a>
+                                                    </p>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>
                                         ))
@@ -182,10 +216,13 @@ function FileTree({ items }: FileTreeProps) {
                         </Collapsible>
                     ) : (
                         <SidebarMenuButton asChild>
-                            <a href={`/profile/${item.id}`} className="flex items-center gap-2">
+                            <p
+                                className={`flex items-center gap-2 cursor-pointer ${selectedFile?.id === item.id ? 'bg-accent text-accent-foreground' : ''}`}
+                                onClick={() => handleFileClick(item)}
+                            >
                                 <FileText className="h-4 w-4" />
                                 <span>{item.name}</span>
-                            </a>
+                            </p>
                         </SidebarMenuButton>
                     )}
                 </SidebarMenuItem>
@@ -432,13 +469,22 @@ function DeleteWorkspaceAlert({ workspace, onWorkspaceDeleted, canDelete }: { wo
     )
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ onFileSelect, ...props }: React.ComponentProps<typeof Sidebar> & { onFileSelect?: (file: File | null) => void, selectedFile: File | null }) {
     const { workSpaces, loading, error, getWorkSpaces } = useWorkSpace()
     const [selectedWorkspace, setSelectedWorkspace] = useState<WorkSpace | null>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
     // Função para atualizar a lista de workspaces e garantir que sempre tenha um selecionado
     const handleWorkspacesUpdate = async () => {
         await getWorkSpaces()
+    }
+
+    // Função para lidar com seleção de arquivo
+    const handleFileSelect = (file: File | null) => {
+        setSelectedFile(file)
+        if (onFileSelect) {
+            onFileSelect(file)
+        }
     }
 
     useEffect(() => {
@@ -452,6 +498,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setSelectedWorkspace(workSpaces[0])
         }
     }, [workSpaces, selectedWorkspace])
+
+    const { items: fileStructure, filesMap } = generateFileStructure(selectedWorkspace)
 
     return (
         <Sidebar {...props}>
@@ -591,7 +639,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarGroupAction title="Adicionar Projeto">
                     </SidebarGroupAction>
                     <SidebarGroupContent>
-                        <FileTree items={generateFileStructure(selectedWorkspace)} />
+                        <FileTree
+                            items={fileStructure}
+                            filesMap={filesMap}
+                            selectedFile={selectedFile}
+                            setSelectedFile={handleFileSelect}
+                        />
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>

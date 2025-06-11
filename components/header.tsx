@@ -8,21 +8,14 @@ import { User, Loader2, AlertCircle, LogOut, Settings, Sun, Moon } from "lucide-
 import { useTheme } from "next-themes"
 import { useGetMe } from "@/hooks/useGetMe"
 import { useEffect } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { useGetFile } from "@/hooks/useGetFile"
+import { File } from "@/lib/types"
 
-export default function Header() {
+export default function Header({ selectedFile, setSelectedFile }: { selectedFile: File | null, setSelectedFile: (file: File | null) => void }) {
     const { theme, setTheme } = useTheme()
     const { user, error, loading, getMe } = useGetMe()
-    const { fileId } = useParams()
-    const { file, error: fileError, loading: fileLoading, getFile } = useGetFile()
 
     useEffect(() => {
         getMe()
-        if (fileId) {
-            getFile(fileId as string)
-        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -32,30 +25,34 @@ export default function Header() {
                 <SidebarTrigger />
                 <Breadcrumb>
                     <BreadcrumbList>
-                        {fileId ? (
+                        {selectedFile ? (
                             <>
-                                <Link href="/profile">
+                                <p className="cursor-pointer" onClick={() => setSelectedFile(null)}>
                                     <BreadcrumbItem>
-                                        <BreadcrumbPage>{file?.workSpace.name}</BreadcrumbPage>
+                                        <BreadcrumbPage>{selectedFile.workSpace?.name || "Workspace"}</BreadcrumbPage>
                                     </BreadcrumbItem>
-                                </Link>
+                                </p>
                                 <BreadcrumbSeparator className="hidden md:block" />
-                                {file?.folder && (
+                                {selectedFile.folder ? (
                                     <>
                                         <BreadcrumbItem>
-                                            <BreadcrumbPage>{file.folder.name}</BreadcrumbPage>
+                                            <BreadcrumbPage>{selectedFile.folder.name}</BreadcrumbPage>
                                         </BreadcrumbItem>
                                         <BreadcrumbSeparator className="hidden md:block" />
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>{selectedFile.title}</BreadcrumbPage>
+                                        </BreadcrumbItem>
                                     </>
+                                ) : (
+                                    <BreadcrumbItem>
+                                        <BreadcrumbPage>{selectedFile.title}</BreadcrumbPage>
+                                    </BreadcrumbItem>
                                 )}
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage>{file?.title}</BreadcrumbPage>
-                                </BreadcrumbItem>
                             </>
                         ) : (
-                            <Link href="/profile">
+                            <BreadcrumbItem>
                                 <BreadcrumbLink>Selecione um arquivo</BreadcrumbLink>
-                            </Link>
+                            </BreadcrumbItem>
                         )}
                     </BreadcrumbList>
                 </Breadcrumb>
