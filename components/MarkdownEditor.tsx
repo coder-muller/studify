@@ -78,14 +78,33 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
     // Auto-resize do textarea
     const handleTextareaResize = () => {
         if (contentRef.current) {
+            // Reset height to auto to get the correct scrollHeight
             contentRef.current.style.height = 'auto'
+            // Set height to scrollHeight to fit all content
             contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
         }
     }
 
+    // Resize on content change
     useEffect(() => {
         handleTextareaResize()
     }, [content])
+
+    // Resize when component mounts and when switching to edit mode
+    useEffect(() => {
+        if (!isPreviewMode && contentRef.current) {
+            // Small delay to ensure the textarea is rendered
+            setTimeout(() => {
+                handleTextareaResize()
+            }, 0)
+        }
+    }, [isPreviewMode])
+
+    // Resize on input
+    const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+        handleTextareaResize()
+        handleContentChange(e as React.ChangeEvent<HTMLTextAreaElement>)
+    }
 
     return (
         <div className="w-full mx-auto">
@@ -170,8 +189,7 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
                 <textarea
                     ref={contentRef}
                     value={content}
-                    onChange={handleContentChange}
-                    onInput={handleTextareaResize}
+                    onChange={handleInput}
                     placeholder="Comece a escrever em Markdown...
                         # Título
                         ## Subtítulo
@@ -190,11 +208,13 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
                         > Citação
 
                         [Link](https://example.com)"
-                    className="w-full p-4 text-base leading-7 outline-none resize-none bg-background text-foreground placeholder:text-muted-foreground"
+                    className="w-full p-4 text-base leading-7 outline-none resize-none bg-background text-foreground placeholder:text-muted-foreground overflow-hidden"
                     style={{
                         fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
                         whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
+                        wordBreak: 'break-word',
+                        minHeight: '200px', // Altura mínima menor
+                        height: 'auto' // Permite crescimento automático
                     }}
                 />
             )}

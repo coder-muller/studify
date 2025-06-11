@@ -9,6 +9,7 @@ import { useTheme } from "next-themes"
 import { useGetMe } from "@/hooks/useGetMe"
 import { useEffect } from "react"
 import { File } from "@/lib/types"
+import { useLogout } from "@/hooks/useLogout"
 
 interface HeaderProps {
     selectedFile: File | null
@@ -20,6 +21,7 @@ interface HeaderProps {
 export default function Header({ selectedFile, setSelectedFile, saveStatus = 'idle', hasChanges = false }: HeaderProps) {
     const { theme, setTheme } = useTheme()
     const { user, error, loading, getMe } = useGetMe()
+    const { logout } = useLogout()
 
     // Função para renderizar indicador de salvamento
     const renderSaveIndicator = () => {
@@ -126,7 +128,7 @@ export default function Header({ selectedFile, setSelectedFile, saveStatus = 'id
                             <Settings className="w-4 h-4" />
                             Configurações
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem className="text-destructive" onClick={logout}>
                             <LogOut className="w-4 h-4 text-destructive" />
                             Sair
                         </DropdownMenuItem>

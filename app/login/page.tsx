@@ -36,7 +36,7 @@ export default function LoginPage() {
     login(data.email, data.password)
       .then(() => {
         toast.success("Login realizado com sucesso")
-        router.push("/profile")
+        router.push("/profile/notes")
       })
       .catch((error) => {
         toast.error(error.message)
