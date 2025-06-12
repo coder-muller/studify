@@ -42,8 +42,8 @@ export default function SignupPage() {
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     createUser(data.name, data.email, data.password)
       .then(() => {
-        toast.success("Conta criada com sucesso")
-        router.push("/login")
+        toast.success("Conta criada com sucesso. Redirecionando...")
+        router.push("/profile/notes")
       })
       .catch((error) => {
         toast.error(error.message)
