@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, Plus, Folder as FolderIcon, FileText, MoreHorizontal, FolderOpen, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown, Plus, Folder as FolderIcon, FileText, MoreHorizontal, FolderOpen, Search, Sprout, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -158,6 +158,7 @@ interface FileTreeProps {
 
 function FileTree({ items, filesMap, selectedFile, setSelectedFile, selectedWorkspace, onDataUpdate }: FileTreeProps) {
   const { moveFile } = useFiles()
+  const [isOpen, setIsOpen] = useState(false)
 
   const handleFileClick = (item: FileItem) => {
     if (item.type === "file") {
@@ -212,16 +213,21 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile, selectedWork
         {items.map((item) => (
           <SidebarMenuItem key={item.id}>
             {item.type === "folder" ? (
-              <Collapsible defaultOpen={false}>
+              <Collapsible open={isOpen} onOpenChange={() => setIsOpen(!isOpen)} defaultOpen={false}>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
                     className="w-full"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, item.id)}
+                    isActive={selectedFile?.id === item.id}
                   >
-                    <FolderOpen className="h-4 w-4" />
+                    <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : "rotate-0"}`} />
+                    {isOpen ? (
+                      <FolderOpen className="h-4 w-4" />
+                    ) : (
+                      <FolderIcon className="h-4 w-4" />
+                    )}
                     <span>{item.name}</span>
-                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <DropdownMenu>
@@ -304,7 +310,7 @@ function FileTree({ items, filesMap, selectedFile, setSelectedFile, selectedWork
           </SidebarMenuItem>
         ))}
       </SidebarMenu>
-    </div>
+    </div >
   )
 }
 
