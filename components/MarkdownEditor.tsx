@@ -6,8 +6,13 @@ import remarkGfm from 'remark-gfm'
 import { File } from "@/lib/types"
 import { useAutoSave } from "@/hooks/useAutoSave"
 import { Edit3, Save } from "lucide-react"
+import CodeMirror from '@uiw/react-codemirror'
+import { markdown } from '@codemirror/lang-markdown'
+import { vim } from '@replit/codemirror-vim'
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useSettings } from "@/hooks/useSettings"
+import RenderSaveIndicator from "./save-indicator"
 
 interface MarkdownEditorProps {
   file: File
@@ -19,7 +24,9 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
   const titleRef = useRef<HTMLHeadingElement>(null)
   const contentRef = useRef<HTMLTextAreaElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const { vim: vimOn, autoSave: autoSaveOn } = useSettings()
   const [isPreviewMode, setIsPreviewMode] = useState(true)
+  const [isVimActive, setVimActive] = useState<boolean>(vimOn)
 
   const {
     title,
@@ -28,13 +35,18 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
     updateContent,
     saveStatus,
     hasChanges,
-    isActive: isAutoSaveActive,
+    setIsActive: setAutoSaveActive,
     forceSave
   } = useAutoSave({
     fileId: file.id,
     initialTitle: file.title,
     initialContent: file.content || "",
     onSaveSuccess
+  })
+  // Obter configurações do usuário
+  useEffect(() => {
+    setAutoSaveActive(autoSaveOn)
+    setVimActive(vimOn)
   })
 
   // Notificar mudanças de status para o pai
@@ -61,12 +73,6 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
       const newTitle = titleRef.current.textContent || ""
       updateTitle(newTitle)
     }
-  }
-
-  // Handler para mudanças no conteúdo
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value
-    updateContent(newContent)
   }
 
   // Prevenir quebra de linha no título
@@ -103,15 +109,9 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
     }
   }, [isPreviewMode])
 
-  // Resize on input
-  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    handleTextareaResize()
-    handleContentChange(e as React.ChangeEvent<HTMLTextAreaElement>)
-  }
-
   const handleSave = () => {
-    setIsPreviewMode(true)
     forceSave()
+    setIsPreviewMode(true)
   }
 
   useEffect(() => {
@@ -126,12 +126,22 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
     }
   }, [rootRef])
 
+  const handleContentKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsPreviewMode(true)
+    }
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault()
+      forceSave()
+      setIsPreviewMode(true)
+    }
+  }
 
   return (
     <div
       ref={rootRef}
       className="w-full mx-auto"
-      onClick={() => setIsPreviewMode(false)}
     >
       {/* Título editável */}
       <div className="flex items-center justify-between mb-8 gap-4">
@@ -152,12 +162,11 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
 
         {/* Toggle entre edição e preview */}
         <div className="flex items-center justify-end z-10 gap-8 mb-4">
-          {!isPreviewMode && (
-            <span className="animate-pulse text-sm text-muted-foreground flex items-center gap-2">
-              <Edit3 className="w-4 h-4" />
-              editando...
-            </span>
-          )}
+          <RenderSaveIndicator
+            selectedFile={file}
+            saveStatus={saveStatus}
+            hasChanges={hasChanges}
+          />
           <Button
             variant="outline"
             size="icon"
@@ -233,7 +242,15 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
         </div>
       ) : (
         /* Modo Edição - Textarea */
-        <textarea
+        <CodeMirror
+          value={content}
+          onChange={(val) => updateContent(val)}
+          height="auto"
+          theme="dark"
+          extensions={[markdown(), isVimActive ? vim() : []]}
+          onKeyDown={handleContentKeyDown}
+        />
+        /* <textarea
           ref={contentRef}
           value={content}
           onChange={handleInput}
@@ -264,7 +281,7 @@ export function MarkdownEditor({ file, onSaveSuccess, onStatusChange }: Markdown
             minHeight: '200px', // Altura mínima menor
             height: 'auto' // Permite crescimento automático
           }}
-        />
+        /> */
       )}
     </div>
   )

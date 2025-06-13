@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useFiles } from "./useFiles"
+import { useSettings } from "./useSettings"
 
 interface UseAutoSaveProps {
   fileId: string | null
@@ -18,12 +19,14 @@ export function useAutoSave({ fileId, initialTitle, initialContent, onSaveSucces
   const { updateFile } = useFiles()
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSavedRef = useRef({ title: initialTitle, content: initialContent })
+  const { autoSave: autoSaveOn } = useSettings()
 
   // Atualizar valores quando o arquivo mudar
   useEffect(() => {
     if (fileId) {
       setTitle(initialTitle)
       setContent(initialContent)
+      setIsActive(autoSaveOn)
       lastSavedRef.current = { title: initialTitle, content: initialContent }
       setHasChanges(false)
       setSaveStatus('idle')
@@ -55,7 +58,7 @@ export function useAutoSave({ fileId, initialTitle, initialContent, onSaveSucces
     }
   }, [fileId, title, content, hasChanges, updateFile, onSaveSuccess])
 
-  // Auto-save com debounce de 5 segundos
+  // Auto-save com debounce de 1 segundo
   useEffect(() => {
     if (!isActive) return
 
@@ -76,7 +79,7 @@ export function useAutoSave({ fileId, initialTitle, initialContent, onSaveSucces
       // Criar novo timeout
       saveTimeoutRef.current = setTimeout(() => {
         saveFile()
-      }, 5000) // 5 segundos
+      }, 1000) // 1 segundo
     }
 
     return () => {
