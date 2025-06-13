@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "autosaveOn" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "vimOn" BOOLEAN NOT NULL DEFAULT false;
