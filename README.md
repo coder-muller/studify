@@ -2,6 +2,53 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+First, deploy a local postgres database and connect to it through the `.env` file. You can use Docker to run a local PostgreSQL instance:
+
+```bash
+docker run --name postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
+```
+
+Then, create a `.env` file in the root of your project with the following content:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+```
+
+Next, install the dependencies:
+
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+# or
+bun install
+```
+
+Then, run the Prisma migrations to set up your database schema:
+
+```bash
+npx prisma migrate dev --name init
+```
+or
+
+```bash
+yarn prisma migrate dev --name init
+```
+or
+
+```bash
+pnpm prisma migrate dev --name init
+```
+or
+
+```bash
+bun prisma migrate dev --name init
+```
+
+## Running the Application
+
 First, run the development server:
 
 ```bash
@@ -34,3 +81,17 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### TODO list
+
+#### logic-wise
+- [x] criar workspace default ao criar conta
+- [ ] criar pasta e arquivo de exemplo ao criar conta
+- [ ] mudar o ícone para pasta fechada caso a pasta esteja fechada (lol)
+- [ ] transformar os checkboxes em itens marcáveis de-facto
+
+#### writing
+- [ ] iniciar modo de edição ao clicar no placeholder/texto
+- [ ] quebrar a linha com um enter
+- [ ] caso haja formatação especial, replicar a formatação no próximo enter
+- [ ] gerar preview durante a escrita, trocando a formatação automaticamente quando um marcador for detectado
